@@ -4,7 +4,6 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 // Shetkjamin Tracker PWA
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Home, MapPin, Plus, Users, MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Star, Share2, Download, Upload, Trash2, Edit3, Eye, Search, Phone, X, Check, TrendingUp, Droplets, FileText, Calculator, ClipboardList, Settings, Copy, Filter, MessageCircle, Navigation, Layers, CheckCircle, Circle, AlertCircle, Award, BarChart3, Wifi, WifiOff, Link2, LogOut, Camera, Image, Video, File, ExternalLink, Loader2, Map } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 
 // Fix Leaflet default marker icons in Vite
@@ -679,6 +678,76 @@ function BudgetCalc({ onBack }) {
   );
 }
 
+// ═══ MAP COMPONENT (vanilla Leaflet — fast, reliable) ═══
+function LeafletMap({ plots, onPlotClick }) {
+  const mapRef = useRef(null);
+  const containerRef = useRef(null);
+  const markersRef = useRef([]);
+
+  // Initialize map once
+  useEffect(() => {
+    if (mapRef.current || !containerRef.current) return;
+    const map = L.map(containerRef.current, {
+      center: [PUNE_LAT, PUNE_LNG],
+      zoom: 10,
+      zoomControl: false,
+      attributionControl: false,
+    });
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+    }).addTo(map);
+    // Pune marker
+    L.marker([PUNE_LAT, PUNE_LNG], { icon: puneIcon }).addTo(map).bindPopup("<b>📍 पुणे (Pune)</b><br/>तुमचे शहर");
+    mapRef.current = map;
+    // Fix tile rendering after layout
+    setTimeout(() => map.invalidateSize(), 200);
+    return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  // Update markers when plots change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Remove old markers
+    markersRef.current.forEach((m) => map.removeLayer(m));
+    markersRef.current = [];
+    // Add new markers
+    const bounds = [[PUNE_LAT, PUNE_LNG]];
+    plots.forEach((p) => {
+      const lat = Number(p.lat), lng = Number(p.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+      bounds.push([lat, lng]);
+      const rate = p.ratePerGuntha ? `₹${p.ratePerGuntha}L` : (p.priceOptions?.length > 0 ? (() => { const o = p.priceOptions[0]; return o.totalPrice && o.gunthas ? `₹${(o.totalPrice/o.gunthas).toFixed(2)}L` : "📍"; })() : "📍");
+      const color = p.status === "shortlisted" ? "#16a34a" : p.status === "rejected" ? "#dc2626" : p.status === "visited" ? "#0891b2" : "#6d28d9";
+      const marker = L.marker([lat, lng], { icon: mkIcon(color, rate) }).addTo(map);
+      const popup = `<div style="min-width:180px;font-family:inherit">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.name || "—"}</div>
+        <div style="font-size:13px;color:#666;margin-bottom:6px">${p.village || ""}, ${p.taluka || ""}</div>
+        ${p.areaGuntha ? `<div style="font-size:13px">📐 ${p.areaGuntha} गुंठे</div>` : ""}
+        ${p.ratePerGuntha ? `<div style="font-size:13px">💰 ₹${p.ratePerGuntha} लाख/गुंठा</div>` : ""}
+        ${p.distKm ? `<div style="font-size:13px">🚗 ${p.distKm} km</div>` : ""}
+        ${p.waterAvail ? `<div style="font-size:13px">💧 ${p.waterAvail.split(" ")[0]}</div>` : ""}
+        <button onclick="window.__openPlot__('${p.id}')" style="margin-top:8px;width:100%;padding:8px 0;background:#065f46;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer">विस्तृत पहा →</button>
+      </div>`;
+      marker.bindPopup(popup);
+      markersRef.current.push(marker);
+    });
+    // Fit bounds if plots exist
+    if (bounds.length > 1) {
+      try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 }); } catch (e) { /* ignore */ }
+    }
+  }, [plots]);
+
+  // Global callback for popup button
+  useEffect(() => {
+    window.__openPlot__ = (id) => onPlotClick(id);
+    return () => { delete window.__openPlot__; };
+  }, [onPlotClick]);
+
+  return <div ref={containerRef} style={{ height: "calc(100vh - 260px)", minHeight: 300, width: "100%" }} />;
+}
+
 // ═══ MAIN APP ═══
 export default function ShetkjaminApp() {
   const [roomCode, setRoomCodeState] = useState(getRoomCode);
@@ -1028,8 +1097,6 @@ export default function ShetkjaminApp() {
   // ═══ MAP HOME ═══
   if (view === "dashboard") {
     const mappable = plots.filter((p) => p.lat && p.lng);
-    const hasPlots = mappable.length > 0;
-    const center = hasPlots ? [Number(mappable[0].lat), Number(mappable[0].lng)] : [PUNE_LAT, PUNE_LNG];
 
     return (
       <div className="min-h-screen bg-gray-50 pb-20 flex flex-col">
@@ -1048,58 +1115,16 @@ export default function ShetkjaminApp() {
           </div>
         </div>
 
-        {/* Map */}
-        <div className="flex-1" style={{ minHeight: "55vh" }}>
-          <MapContainer center={center} zoom={hasPlots ? 10 : 11} style={{ height: "100%", width: "100%" }} scrollWheelZoom={true} zoomControl={false}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap' />
-
-            {/* Pune pin */}
-            <Marker position={[PUNE_LAT, PUNE_LNG]} icon={puneIcon}>
-              <Popup><div className="text-center"><strong>पुणे (Pune)</strong><br/><span className="text-xs text-gray-500">तुमचे शहर</span></div></Popup>
-            </Marker>
-
-            {/* Plot pins */}
-            {mappable.map((p) => {
-              const rate = p.ratePerGuntha ? `₹${p.ratePerGuntha}L/गुंठा` : (p.areaGuntha && p.priceOptions?.length > 0 ? (() => { const o = p.priceOptions[0]; return o.totalPrice && o.gunthas ? `₹${(o.totalPrice/o.gunthas).toFixed(2)}L` : p.name; })() : p.name);
-              const color = p.status === "shortlisted" ? "#16a34a" : p.status === "rejected" ? "#dc2626" : p.status === "visited" ? "#0891b2" : "#6d28d9";
-              return (
-                <Marker key={p.id} position={[Number(p.lat), Number(p.lng)]} icon={mkIcon(color, rate)}>
-                  <Popup>
-                    <div style={{ minWidth: 180 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{p.name || "—"}</div>
-                      <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>{p.village}, {p.taluka}</div>
-                      {p.areaGuntha && <div style={{ fontSize: 13 }}>📐 {p.areaGuntha} गुंठे</div>}
-                      {p.ratePerGuntha && <div style={{ fontSize: 13 }}>💰 ₹{p.ratePerGuntha} लाख/गुंठा</div>}
-                      {p.distKm && <div style={{ fontSize: 13 }}>🚗 {p.distKm} km ({p.travelHrs || "?"}hr)</div>}
-                      {p.waterAvail && <div style={{ fontSize: 13 }}>💧 {p.waterAvail.split(" ")[0]}</div>}
-                      <button onClick={() => { setSelId(p.id); setView("detail"); }} style={{ marginTop: 8, width: "100%", padding: "6px 0", background: "#065f46", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>विस्तृत पहा →</button>
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-          </MapContainer>
-        </div>
+        {/* Map — vanilla Leaflet */}
+        <LeafletMap plots={mappable} onPlotClick={(id) => { setSelId(id); setView("detail"); }} />
 
         {/* Quick stats below map */}
         <div className="px-4 py-3 space-y-3">
           <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
-              <div className="text-xl font-bold text-gray-900">{plots.length}</div>
-              <div className="text-[11px] text-gray-500">एकूण</div>
-            </div>
-            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
-              <div className="text-xl font-bold text-green-700">{stats.shortlisted}</div>
-              <div className="text-[11px] text-gray-500">Shortlist</div>
-            </div>
-            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
-              <div className="text-xl font-bold text-cyan-700">{stats.visited}</div>
-              <div className="text-[11px] text-gray-500">भेट झाली</div>
-            </div>
-            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
-              <div className="text-xl font-bold text-orange-600">{stats.pending}</div>
-              <div className="text-[11px] text-gray-500">बाकी</div>
-            </div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm"><div className="text-xl font-bold text-gray-900">{plots.length}</div><div className="text-[11px] text-gray-500">एकूण</div></div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm"><div className="text-xl font-bold text-green-700">{stats.shortlisted}</div><div className="text-[11px] text-gray-500">Shortlist</div></div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm"><div className="text-xl font-bold text-cyan-700">{stats.visited}</div><div className="text-[11px] text-gray-500">भेट झाली</div></div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm"><div className="text-xl font-bold text-orange-600">{stats.pending}</div><div className="text-[11px] text-gray-500">बाकी</div></div>
           </div>
 
           {plots.length === 0 && <div className="bg-white rounded-xl border p-6 text-center shadow-sm">
