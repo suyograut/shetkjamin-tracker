@@ -8,12 +8,12 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID",
+ apiKey: "AIzaSyBMeJxYje1_I_jWligvsdVGfc2lgV63Duc",
+  authDomain: "shetkjamin-tracker.firebaseapp.com",
+  projectId: "shetkjamin-tracker",
+  storageBucket: "shetkjamin-tracker.firebasestorage.app",
+  messagingSenderId: "1072599352301",
+  appId: "1:1072599352301:web:b12953437c501bd7031de4"
 };
 
 const app = initializeApp(firebaseConfig);
