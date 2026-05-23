@@ -3,7 +3,17 @@ import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from "fire
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 // Shetkjamin Tracker PWA
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Home, MapPin, Plus, Users, MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Star, Share2, Download, Upload, Trash2, Edit3, Eye, Search, Phone, X, Check, TrendingUp, Droplets, FileText, Calculator, ClipboardList, Settings, Copy, Filter, MessageCircle, Navigation, Layers, CheckCircle, Circle, AlertCircle, Award, BarChart3, Wifi, WifiOff, Link2, LogOut, Camera, Image, Video, File, ExternalLink, Loader2 } from "lucide-react";
+import { Home, MapPin, Plus, Users, MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Star, Share2, Download, Upload, Trash2, Edit3, Eye, Search, Phone, X, Check, TrendingUp, Droplets, FileText, Calculator, ClipboardList, Settings, Copy, Filter, MessageCircle, Navigation, Layers, CheckCircle, Circle, AlertCircle, Award, BarChart3, Wifi, WifiOff, Link2, LogOut, Camera, Image, Video, File, ExternalLink, Loader2, Map } from "lucide-react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+
+// Fix Leaflet default marker icons in Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 // ═══ CONSTANTS ═══
 const STATUS_OPTS = [
@@ -71,7 +81,20 @@ const scorePlot = (p, w) => {
   CRITERIA.forEach((c) => { const s = p.scores[c.k] || 0; if (s > 0) { tot += s * (w[c.k] || c.w); ws += (w[c.k] || c.w); } });
   return ws > 0 ? tot / ws : 0;
 };
-const mkPlot = () => ({ id: uid(), name: "", taluka: "", village: "", gutNo: "", areaGuntha: "", ratePerGuntha: "", distKm: "", travelHrs: "", road: "", soil: "", waterSrc: "", borewellDepth: "", waterAvail: "", elec: "", network: "", terrain: "", surrounding: "", culture: "", existingCrops: "", farmhouseFeasible: "", sevenTwelve: "", ownerType: "", agentName: "", agentPhone: "", visitDate: "", visitNotes: "", photoLink: "", mapsLink: "", status: "new", scores: {}, checklist: {}, media: [] });
+const mkPlot = () => ({ id: uid(), name: "", taluka: "", village: "", gutNo: "", areaGuntha: "", ratePerGuntha: "", distKm: "", travelHrs: "", road: "", soil: "", waterSrc: "", borewellDepth: "", waterAvail: "", elec: "", network: "", terrain: "", surrounding: "", culture: "", existingCrops: "", farmhouseFeasible: "", sevenTwelve: "", ownerType: "", agentName: "", agentPhone: "", visitDate: "", visitNotes: "", photoLink: "", mapsLink: "", status: "new", scores: {}, checklist: {}, media: [], description: "", priceOptions: [], lat: "", lng: "" });
+
+// Leaflet marker icons
+const PUNE_LAT = 18.5204, PUNE_LNG = 73.8567;
+const mkIcon = (color, label) => L.divIcon({
+  className: "custom-marker",
+  html: `<div style="background:${color};color:#fff;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">${label}<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${color};position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);"></div></div>`,
+  iconSize: [0, 0], iconAnchor: [0, 0],
+});
+const puneIcon = L.divIcon({
+  className: "pune-marker",
+  html: `<div style="background:#dc2626;color:#fff;padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(220,38,38,0.4);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">📍 पुणे<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #dc2626;position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);"></div></div>`,
+  iconSize: [0, 0], iconAnchor: [0, 0],
+});
 const mkAgent = () => ({ id: uid(), name: "", phone: "", area: "", referral: "", firstContact: "", trust: 3, commission: "", directOwner: false, notes: "" });
 const waMsg = (p, w) => {
   const cost = p.areaGuntha && p.ratePerGuntha ? (p.areaGuntha * p.ratePerGuntha).toFixed(2) : "—";
@@ -219,17 +242,17 @@ function RoomSetup({ onJoin }) {
 }
 
 // ═══ UI PRIMITIVES ═══
-const Badge = ({ status }) => { const s = STATUS_OPTS.find((o) => o.v === status); return s ? <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${s.c}`}>{s.l}</span> : null; };
+const Badge = ({ status }) => { const s = STATUS_OPTS.find((o) => o.v === status); return s ? <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${s.c}`}>{s.l}</span> : null; };
 const Btn = ({ children, onClick, v = "primary", className = "", disabled }) => {
   const cls = { primary: "bg-emerald-700 text-white active:bg-emerald-800", secondary: "bg-gray-100 text-gray-700 border border-gray-300 active:bg-gray-200", danger: "bg-red-50 text-red-600 border border-red-200" };
-  return <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 font-medium rounded-lg px-4 py-2.5 text-sm transition-all active:scale-95 disabled:opacity-40 ${cls[v] || cls.primary} ${className}`}>{children}</button>;
+  return <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 font-medium rounded-lg px-4 py-3 text-base transition-all active:scale-95 disabled:opacity-40 ${cls[v] || cls.primary} ${className}`}>{children}</button>;
 };
-const Inp = ({ value, onChange, type = "text", placeholder, ...r }) => <input type={type} value={value ?? ""} onChange={(e) => onChange(type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)} placeholder={placeholder} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white" {...r} />;
-const Sel = ({ value, onChange, options, ph }) => <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"><option value="">{ph || "— निवडा —"}</option>{options.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
-const Txa = ({ value, onChange, rows = 3, placeholder }) => <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={rows} placeholder={placeholder} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white" />;
-const Fld = ({ label, hint, children }) => <div className="space-y-1"><label className="block text-xs font-medium text-gray-600">{label}</label>{children}{hint && <p className="text-[10px] text-gray-400">{hint}</p>}</div>;
-const Stars = ({ value, onChange, sz = 20 }) => <div className="flex gap-0.5">{[1,2,3,4,5].map((i) => <button key={i} type="button" onClick={() => onChange && onChange(i)} className="p-0.5"><Star size={sz} className={i <= (value||0) ? "fill-amber-400 text-amber-400" : "text-gray-300"} /></button>)}</div>;
-const TopBar = ({ title, onBack, right }) => <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200 px-4 py-3 flex items-center gap-3">{onBack && <button onClick={onBack} className="p-1 -ml-1"><ChevronLeft size={22} className="text-gray-600" /></button>}<h1 className="text-lg font-bold text-gray-900 flex-1 truncate">{title}</h1>{right}</div>;
+const Inp = ({ value, onChange, type = "text", placeholder, ...r }) => <input type={type} value={value ?? ""} onChange={(e) => onChange(type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)} placeholder={placeholder} className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white" {...r} />;
+const Sel = ({ value, onChange, options, ph }) => <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"><option value="">{ph || "— निवडा —"}</option>{options.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
+const Txa = ({ value, onChange, rows = 3, placeholder }) => <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={rows} placeholder={placeholder} className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white" />;
+const Fld = ({ label, hint, children }) => <div className="space-y-1.5"><label className="block text-sm font-semibold text-gray-700">{label}</label>{children}{hint && <p className="text-xs text-gray-400">{hint}</p>}</div>;
+const Stars = ({ value, onChange, sz = 24 }) => <div className="flex gap-1">{[1,2,3,4,5].map((i) => <button key={i} type="button" onClick={() => onChange && onChange(i)} className="p-0.5"><Star size={sz} className={i <= (value||0) ? "fill-amber-400 text-amber-400" : "text-gray-300"} /></button>)}</div>;
+const TopBar = ({ title, onBack, right }) => <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200 px-4 py-3.5 flex items-center gap-3">{onBack && <button onClick={onBack} className="p-1 -ml-1"><ChevronLeft size={24} className="text-gray-600" /></button>}<h1 className="text-xl font-bold text-gray-900 flex-1 truncate">{title}</h1>{right}</div>;
 const StatCard = ({ label, value, icon: Icon }) => <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm"><div className="flex items-center gap-2 mb-1">{Icon && <Icon size={14} className="text-emerald-600" />}<span className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</span></div><div className="text-xl font-bold text-gray-900">{value}</div></div>;
 const Card = ({ children, className = "", onClick }) => <div onClick={onClick} className={`bg-white rounded-xl border border-gray-200 shadow-sm ${onClick ? "cursor-pointer active:scale-[0.99]" : ""} ${className}`}>{children}</div>;
 
@@ -237,7 +260,7 @@ const Card = ({ children, className = "", onClick }) => <div onClick={onClick} c
 function PlotForm({ initial, onSave, onCancel, notify }) {
   const [p, setP] = useState(initial || mkPlot());
   const u = (k, v) => setP((prev) => ({ ...prev, [k]: v }));
-  const [openSec, setOpen] = useState({ loc: true, price: true, dist: false, water: false, infra: false, village: false, agent: false });
+  const [openSec, setOpen] = useState({ loc: true, price: true, desc: false, dist: false, water: false, infra: false, village: false, agent: false });
   const toggle = (k) => setOpen((s) => ({ ...s, [k]: !s[k] }));
   const cost = p.areaGuntha && p.ratePerGuntha ? (p.areaGuntha * p.ratePerGuntha).toFixed(2) : null;
 
@@ -258,11 +281,48 @@ function PlotForm({ initial, onSave, onCancel, notify }) {
           <Fld label="गाव"><Inp value={p.village} onChange={(v) => u("village",v)} /></Fld>
           <Fld label="गट नंबर"><Inp value={p.gutNo} onChange={(v) => u("gutNo",v)} /></Fld>
           <Fld label="Google Maps लिंक"><Inp value={p.mapsLink} onChange={(v) => u("mapsLink",v)} placeholder="https://maps.google.com/..." /></Fld>
+          <div className="grid grid-cols-2 gap-2">
+            <Fld label="Latitude" hint="उदा: 18.45"><Inp value={p.lat} onChange={(v) => u("lat",v)} type="number" step="0.0001" placeholder="18.45" /></Fld>
+            <Fld label="Longitude" hint="उदा: 73.65"><Inp value={p.lng} onChange={(v) => u("lng",v)} type="number" step="0.0001" placeholder="73.65" /></Fld>
+          </div>
         </>)}
         {sec("price", "📐 क्षेत्रफळ व किंमत", <>
           <Fld label="एकूण क्षेत्रफळ (गुंठे)" hint="1 एकर = 40 गुंठे"><Inp value={p.areaGuntha} onChange={(v) => u("areaGuntha",v)} type="number" placeholder="120" /></Fld>
           <Fld label="दर प्रति गुंठा (₹ लाख)"><Inp value={p.ratePerGuntha} onChange={(v) => u("ratePerGuntha",v)} type="number" placeholder="0.5" /></Fld>
-          {cost && <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center"><span className="text-xs text-emerald-600">एकूण जमीन किंमत</span><div className="text-xl font-bold text-emerald-800">₹{cost} लाख</div></div>}
+          {cost && <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center"><span className="text-sm text-emerald-600">एकूण जमीन किंमत</span><div className="text-2xl font-bold text-emerald-800">₹{cost} लाख</div></div>}
+
+          {/* Multiple price options */}
+          <div className="border-t border-gray-200 pt-3 mt-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-700">💰 किंमत पर्याय (Price Options)</span>
+              <button type="button" onClick={() => u("priceOptions", [...(p.priceOptions||[]), { id: uid(), totalPrice: "", gunthas: "" }])} className="text-sm text-emerald-700 font-medium px-3 py-1 bg-emerald-50 rounded-lg">+ जोडा</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">एजंटने वेगवेगळे पर्याय दिल्यास इथे सर्व नोंदवा</p>
+            {(p.priceOptions||[]).map((opt, idx) => {
+              const perG = opt.totalPrice && opt.gunthas && opt.gunthas > 0 ? (opt.totalPrice / opt.gunthas).toFixed(3) : null;
+              return <div key={opt.id} className="bg-gray-50 rounded-lg p-3 mb-2 border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">पर्याय #{idx+1}</span>
+                  <button type="button" onClick={() => u("priceOptions", (p.priceOptions||[]).filter((_,i)=>i!==idx))} className="text-red-400 hover:text-red-600"><X size={16}/></button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Fld label="एकूण किंमत (₹ लाख)"><Inp type="number" value={opt.totalPrice} onChange={(v) => { const nOpts = [...(p.priceOptions||[])]; nOpts[idx] = {...opt, totalPrice: v}; u("priceOptions", nOpts); }} placeholder="7" /></Fld>
+                  <Fld label="गुंठे"><Inp type="number" value={opt.gunthas} onChange={(v) => { const nOpts = [...(p.priceOptions||[])]; nOpts[idx] = {...opt, gunthas: v}; u("priceOptions", nOpts); }} placeholder="11" /></Fld>
+                </div>
+                {perG && <div className="mt-2 bg-white rounded p-2 text-center border border-emerald-200">
+                  <span className="text-xs text-emerald-600">दर प्रति गुंठा: </span>
+                  <span className="text-base font-bold text-emerald-800">₹{perG} लाख</span>
+                </div>}
+                {perG && <button type="button" onClick={() => { u("areaGuntha", opt.gunthas); u("ratePerGuntha", parseFloat(perG)); }} className="mt-1 w-full text-xs text-blue-600 py-1 hover:bg-blue-50 rounded">↑ हा मुख्य दर म्हणून सेट करा</button>}
+              </div>;
+            })}
+          </div>
+        </>)}
+
+        {sec("desc", "📝 वर्णन / हायलाइट्स (Description)", <>
+          <Fld label="प्लॉटचे तपशीलवार वर्णन" hint="जमिनीबद्दल सर्व महत्त्वाची माहिती, हायलाइट्स, एजंटने सांगितलेले मुद्दे...">
+            <Txa value={p.description} onChange={(v) => u("description",v)} rows={6} placeholder="उदा: डोंगरावरून सुंदर दृश्य, आंब्याची 15 झाडे आहेत, शेजारी ओढा आहे, रस्त्यापासून 200 मीटर आत..." />
+          </Fld>
         </>)}
         {sec("dist", "🚗 अंतर व रस्ता", <>
           <Fld label="पुण्यापासून अंतर (km)"><Inp value={p.distKm} onChange={(v) => u("distKm",v)} type="number" /></Fld>
@@ -358,7 +418,33 @@ function PlotDetail({ plot, weights, onBack, onEdit, onDelete, onUpdate, notify,
       </div>
       <div className="p-4">
         {tab === "info" && <div className="space-y-3">
-          <Card className="divide-y divide-gray-100">{info.map(([l,v],i) => <div key={i} className="flex justify-between items-center px-4 py-2.5"><span className="text-xs text-gray-500">{l}</span><span className="text-sm font-medium text-gray-800 text-right max-w-[60%]">{v}</span></div>)}</Card>
+          <Card className="divide-y divide-gray-100">{info.map(([l,v],i) => <div key={i} className="flex justify-between items-center px-4 py-3"><span className="text-sm text-gray-500">{l}</span><span className="text-base font-medium text-gray-800 text-right max-w-[60%]">{v}</span></div>)}</Card>
+
+          {/* Price Options */}
+          {(p.priceOptions||[]).length > 0 && <Card className="p-4">
+            <div className="text-sm font-semibold text-gray-700 mb-3">💰 किंमत पर्याय ({(p.priceOptions||[]).length})</div>
+            <div className="space-y-2">
+              {(p.priceOptions||[]).map((opt, i) => {
+                const perG = opt.totalPrice && opt.gunthas && opt.gunthas > 0 ? (opt.totalPrice / opt.gunthas).toFixed(3) : null;
+                return <div key={opt.id || i} className="flex items-center justify-between bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div>
+                    <div className="text-base font-bold text-gray-800">₹{opt.totalPrice || "—"} लाख</div>
+                    <div className="text-sm text-gray-500">{opt.gunthas || "—"} गुंठे</div>
+                  </div>
+                  {perG && <div className="text-right bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                    <div className="text-xs text-emerald-600">प्रति गुंठा</div>
+                    <div className="text-lg font-bold text-emerald-800">₹{perG} L</div>
+                  </div>}
+                </div>;
+              })}
+            </div>
+          </Card>}
+
+          {/* Description */}
+          {p.description && <Card className="p-4">
+            <div className="text-sm font-semibold text-gray-700 mb-2">📝 वर्णन / हायलाइट्स</div>
+            <div className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">{p.description}</div>
+          </Card>}
           {p.visitNotes && <Card className="p-4"><div className="text-xs text-gray-500 mb-1">📝 टिपणे</div><div className="text-sm text-gray-700 whitespace-pre-wrap">{p.visitNotes}</div></Card>}
           {p.mapsLink && <a href={p.mapsLink} target="_blank" rel="noopener noreferrer"><Btn v="secondary" className="w-full"><Navigation size={16}/> Google Maps</Btn></a>}
           <div className="flex gap-2"><Btn v="secondary" onClick={copyText} className="flex-1"><Copy size={16}/> कॉपी</Btn><Btn onClick={share} className="flex-1"><MessageCircle size={16}/> WhatsApp</Btn></div>
@@ -939,58 +1025,106 @@ export default function ShetkjaminApp() {
     </div>
   );
 
-  // ═══ DASHBOARD ═══
-  if (view === "dashboard") return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="bg-gradient-to-br from-emerald-800 to-emerald-900 text-white px-5 pt-6 pb-8">
-        <div className="flex items-center justify-between">
-          <div className="text-2xl">🌾</div>
+  // ═══ MAP HOME ═══
+  if (view === "dashboard") {
+    const mappable = plots.filter((p) => p.lat && p.lng);
+    const hasPlots = mappable.length > 0;
+    const center = hasPlots ? [Number(mappable[0].lat), Number(mappable[0].lng)] : [PUNE_LAT, PUNE_LNG];
+
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20 flex flex-col">
+        {/* Header bar */}
+        <div className="bg-emerald-800 text-white px-4 py-3 flex items-center justify-between z-10">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌾</span>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">शेतजमीन ट्रॅकर</h1>
+              <p className="text-emerald-300 text-xs">{plots.length} प्लॉट • {mappable.length} नकाशावर</p>
+            </div>
+          </div>
           <div className="flex items-center gap-1.5 bg-white/15 rounded-full px-2.5 py-1">
             {online ? <Wifi size={12}/> : <WifiOff size={12}/>}
-            <span className="text-[10px] font-mono">{roomCode}</span>
+            <span className="text-xs font-mono">{roomCode}</span>
           </div>
         </div>
-        <h1 className="text-xl font-bold mt-1">शेतजमीन ट्रॅकर</h1><p className="text-emerald-200 text-xs mt-0.5">Farmland Decision Tracker</p>
-      </div>
-      <div className="px-4 -mt-4 space-y-4">
-        <div className="grid grid-cols-2 gap-2.5">
-          <StatCard label="एकूण प्लॉट" value={stats.total} icon={Layers}/>
-          <StatCard label="Shortlisted" value={stats.shortlisted} icon={Star}/>
-          <StatCard label="भेट झालेले" value={stats.visited} icon={Eye}/>
-          <StatCard label="भेट बाकी" value={stats.pending} icon={AlertCircle}/>
+
+        {/* Map */}
+        <div className="flex-1" style={{ minHeight: "55vh" }}>
+          <MapContainer center={center} zoom={hasPlots ? 10 : 11} style={{ height: "100%", width: "100%" }} scrollWheelZoom={true} zoomControl={false}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap' />
+
+            {/* Pune pin */}
+            <Marker position={[PUNE_LAT, PUNE_LNG]} icon={puneIcon}>
+              <Popup><div className="text-center"><strong>पुणे (Pune)</strong><br/><span className="text-xs text-gray-500">तुमचे शहर</span></div></Popup>
+            </Marker>
+
+            {/* Plot pins */}
+            {mappable.map((p) => {
+              const rate = p.ratePerGuntha ? `₹${p.ratePerGuntha}L/गुंठा` : (p.areaGuntha && p.priceOptions?.length > 0 ? (() => { const o = p.priceOptions[0]; return o.totalPrice && o.gunthas ? `₹${(o.totalPrice/o.gunthas).toFixed(2)}L` : p.name; })() : p.name);
+              const color = p.status === "shortlisted" ? "#16a34a" : p.status === "rejected" ? "#dc2626" : p.status === "visited" ? "#0891b2" : "#6d28d9";
+              return (
+                <Marker key={p.id} position={[Number(p.lat), Number(p.lng)]} icon={mkIcon(color, rate)}>
+                  <Popup>
+                    <div style={{ minWidth: 180 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{p.name || "—"}</div>
+                      <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>{p.village}, {p.taluka}</div>
+                      {p.areaGuntha && <div style={{ fontSize: 13 }}>📐 {p.areaGuntha} गुंठे</div>}
+                      {p.ratePerGuntha && <div style={{ fontSize: 13 }}>💰 ₹{p.ratePerGuntha} लाख/गुंठा</div>}
+                      {p.distKm && <div style={{ fontSize: 13 }}>🚗 {p.distKm} km ({p.travelHrs || "?"}hr)</div>}
+                      {p.waterAvail && <div style={{ fontSize: 13 }}>💧 {p.waterAvail.split(" ")[0]}</div>}
+                      <button onClick={() => { setSelId(p.id); setView("detail"); }} style={{ marginTop: 8, width: "100%", padding: "6px 0", background: "#065f46", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>विस्तृत पहा →</button>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MapContainer>
         </div>
-        {stats.total > 0 && <>
-          <Card className="p-4"><div className="text-xs font-medium text-gray-500 mb-3">💰 दर प्रति गुंठा (₹ लाख)</div><div className="grid grid-cols-3 gap-3 text-center">
-            <div><div className="text-lg font-bold text-green-700">{stats.minPrice}</div><div className="text-[10px] text-gray-400">कमीत कमी</div></div>
-            <div><div className="text-lg font-bold text-blue-700">{stats.avgPrice}</div><div className="text-[10px] text-gray-400">सरासरी</div></div>
-            <div><div className="text-lg font-bold text-red-600">{stats.maxPrice}</div><div className="text-[10px] text-gray-400">जास्तीत जास्त</div></div>
-          </div></Card>
-          <div className="grid grid-cols-2 gap-2.5">
-            <StatCard label="≤2 तास" value={stats.within2hr} icon={Navigation}/>
-            <StatCard label="बारमाही पाणी" value={stats.goodWater} icon={Droplets}/>
-            <StatCard label="७/१२ स्वच्छ" value={stats.clearTitle} icon={FileText}/>
-            <StatCard label="फार्महाऊस शक्य" value={stats.fhOk} icon={Home}/>
+
+        {/* Quick stats below map */}
+        <div className="px-4 py-3 space-y-3">
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
+              <div className="text-xl font-bold text-gray-900">{plots.length}</div>
+              <div className="text-[11px] text-gray-500">एकूण</div>
+            </div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
+              <div className="text-xl font-bold text-green-700">{stats.shortlisted}</div>
+              <div className="text-[11px] text-gray-500">Shortlist</div>
+            </div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
+              <div className="text-xl font-bold text-cyan-700">{stats.visited}</div>
+              <div className="text-[11px] text-gray-500">भेट झाली</div>
+            </div>
+            <div className="bg-white rounded-xl border p-2.5 shadow-sm">
+              <div className="text-xl font-bold text-orange-600">{stats.pending}</div>
+              <div className="text-[11px] text-gray-500">बाकी</div>
+            </div>
           </div>
-          {stats.top3.length > 0 && <Card className="p-4"><div className="text-xs font-medium text-gray-500 mb-3">🏆 टॉप प्लॉट्स</div>
-            {stats.top3.map((p,i) => <div key={p.id} onClick={() => { setSelId(p.id); setView("detail"); }} className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 rounded-lg px-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i===0?"bg-amber-100 text-amber-700":"bg-gray-100 text-gray-600"}`}>{i+1}</div>
-              <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{p.name}</div><div className="text-[10px] text-gray-400">{p.village}, {p.taluka}</div></div>
-              <div className="text-sm font-bold text-amber-600">{scorePlot(p,weights).toFixed(1)}</div>
-            </div>)}
-          </Card>}
-        </>}
-        {stats.total === 0 && <Card className="p-8 text-center"><div className="text-3xl mb-2">📋</div><div className="text-gray-500 text-sm mb-3">अजून प्लॉट नाही</div><Btn onClick={() => { setEditPlot(null); setView("form"); }}><Plus size={16}/> पहिला प्लॉट जोडा</Btn></Card>}
+
+          {plots.length === 0 && <div className="bg-white rounded-xl border p-6 text-center shadow-sm">
+            <div className="text-3xl mb-2">📋</div>
+            <div className="text-gray-500 mb-3">अजून प्लॉट नाहीत</div>
+            <Btn onClick={() => { setEditPlot(null); setView("form"); }}><Plus size={18}/> पहिला प्लॉट जोडा</Btn>
+          </div>}
+
+          {mappable.length === 0 && plots.length > 0 && <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 text-center">
+            <div className="text-sm text-amber-700">📍 नकाशावर प्लॉट दिसण्यासाठी Latitude / Longitude टाका</div>
+            <div className="text-xs text-amber-500 mt-1">प्लॉट → संपादन → स्थान विभागात</div>
+          </div>}
+        </div>
+
+        <BottomNav view={view} setView={setView} setEditPlot={setEditPlot} />
       </div>
-      <BottomNav view={view} setView={setView} setEditPlot={setEditPlot} />
-    </div>
-  );
+    );
+  }
 
   // ═══ PLOT LIST ═══
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <TopBar title={`प्लॉट्स (${filtered.length})`} right={<button onClick={() => setShowF(!showFilter)} className={`p-2 rounded-lg ${showFilter?"bg-emerald-100":"hover:bg-gray-100"}`}><Filter size={18} className={showFilter?"text-emerald-700":"text-gray-600"}/></button>} />
       <div className="px-4 pt-2 space-y-2">
-        <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="शोधा... (नाव, गाव, तालुका)" className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"/></div>
+        <div className="relative"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="शोधा... (नाव, गाव, तालुका)" className="w-full pl-10 pr-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"/></div>
         {showFilter && <Card className="p-3 space-y-2">
           <Fld label="स्थिती"><select value={statusFilter} onChange={(e)=>setSF(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"><option value="all">सर्व</option>{STATUS_OPTS.map((s)=><option key={s.v} value={s.v}>{s.l}</option>)}</select></Fld>
           <Fld label="क्रमवारी"><select value={sortBy} onChange={(e)=>setSort(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"><option value="date">नवीनतम</option><option value="score">गुणांक ↓</option><option value="price">किंमत ↑</option><option value="distance">अंतर ↑</option></select></Fld>
@@ -1000,13 +1134,13 @@ export default function ShetkjaminApp() {
         {filtered.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">कोणताही प्लॉट नाही</div>}
         {filtered.map((p) => { const cost = p.areaGuntha && p.ratePerGuntha ? (p.areaGuntha*p.ratePerGuntha).toFixed(1) : null; const sc = scorePlot(p,weights); return (
           <Card key={p.id} onClick={() => { setSelId(p.id); setView("detail"); }} className="p-4">
-            <div className="flex justify-between items-start mb-2"><div className="flex-1 min-w-0"><h3 className="text-sm font-semibold text-gray-900 truncate">{p.name||"—"}</h3><p className="text-xs text-gray-500 mt-0.5">{p.village?p.village+", ":""}{p.taluka||"—"}</p></div><Badge status={p.status}/></div>
+            <div className="flex justify-between items-start mb-2"><div className="flex-1 min-w-0"><h3 className="text-base font-semibold text-gray-900 truncate">{p.name||"—"}</h3><p className="text-sm text-gray-500 mt-0.5">{p.village?p.village+", ":""}{p.taluka||"—"}</p></div><Badge status={p.status}/></div>
             <div className="grid grid-cols-3 gap-2 text-center mt-2">
-              <div className="bg-gray-50 rounded-lg p-2"><div className="text-xs text-gray-500">गुंठे</div><div className="text-sm font-bold">{p.areaGuntha||"—"}</div></div>
-              <div className="bg-gray-50 rounded-lg p-2"><div className="text-xs text-gray-500">दर/गुंठा</div><div className="text-sm font-bold">{p.ratePerGuntha?`₹${p.ratePerGuntha}L`:"—"}</div></div>
-              <div className="bg-emerald-50 rounded-lg p-2"><div className="text-xs text-emerald-600">एकूण</div><div className="text-sm font-bold text-emerald-700">{cost?`₹${cost}L`:"—"}</div></div>
+              <div className="bg-gray-50 rounded-lg p-2"><div className="text-sm text-gray-500">गुंठे</div><div className="text-base font-bold">{p.areaGuntha||"—"}</div></div>
+              <div className="bg-gray-50 rounded-lg p-2"><div className="text-sm text-gray-500">दर/गुंठा</div><div className="text-base font-bold">{p.ratePerGuntha?`₹${p.ratePerGuntha}L`:"—"}</div></div>
+              <div className="bg-emerald-50 rounded-lg p-2"><div className="text-sm text-emerald-600">एकूण</div><div className="text-base font-bold text-emerald-700">{cost?`₹${cost}L`:"—"}</div></div>
             </div>
-            <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+            <div className="flex items-center gap-3 mt-2.5 text-sm text-gray-500">
               {p.distKm&&<span>🚗 {p.distKm}km</span>}{p.travelHrs&&<span>⏱️ {p.travelHrs}hr</span>}{p.waterAvail&&<span>💧 {p.waterAvail.split(" ")[0]}</span>}
               {(p.media||[]).length>0&&<span>📷 {(p.media||[]).length}</span>}
               {sc>0&&<span className="ml-auto font-semibold text-amber-600">⭐ {sc.toFixed(1)}</span>}
@@ -1025,7 +1159,7 @@ function BottomNav({ view, setView, setEditPlot }) {
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-lg">
       <div className="max-w-lg mx-auto flex">
         {[
-          { v: "dashboard", icon: Home, label: "होम" },
+          { v: "dashboard", icon: Map, label: "नकाशा" },
           { v: "plots", icon: MapPin, label: "प्लॉट्स" },
           { v: "form", icon: Plus, label: "जोडा", special: true },
           { v: "scoring", icon: Award, label: "गुण" },
