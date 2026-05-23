@@ -82,16 +82,16 @@ const scorePlot = (p, w) => {
 };
 const mkPlot = () => ({ id: uid(), name: "", taluka: "", village: "", gutNo: "", areaGuntha: "", ratePerGuntha: "", distKm: "", travelHrs: "", road: "", soil: "", waterSrc: "", borewellDepth: "", waterAvail: "", elec: "", network: "", terrain: "", surrounding: "", culture: "", existingCrops: "", farmhouseFeasible: "", sevenTwelve: "", ownerType: "", agentName: "", agentPhone: "", visitDate: "", visitNotes: "", photoLink: "", mapsLink: "", status: "new", scores: {}, checklist: {}, media: [], description: "", priceOptions: [], lat: "", lng: "" });
 
-// Leaflet marker icons
+// Leaflet marker icons — dark text on light background for readability
 const PUNE_LAT = 18.5204, PUNE_LNG = 73.8567;
 const mkIcon = (color, label) => L.divIcon({
   className: "custom-marker",
-  html: `<div style="background:${color};color:#fff;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">${label}<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${color};position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);"></div></div>`,
+  html: `<div style="background:#fffffc;color:#1a1a1a;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:3px solid ${color};text-align:center;transform:translate(-50%,-100%);position:relative;line-height:1.2;">${label}<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid ${color};position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);"></div></div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
 const puneIcon = L.divIcon({
   className: "pune-marker",
-  html: `<div style="background:#dc2626;color:#fff;padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(220,38,38,0.4);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">📍 पुणे<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #dc2626;position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);"></div></div>`,
+  html: `<div style="background:#dc2626;color:#fff;padding:6px 12px;border-radius:10px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(220,38,38,0.4);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">📍 पुणे<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #dc2626;position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);"></div></div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
 const mkAgent = () => ({ id: uid(), name: "", phone: "", area: "", referral: "", firstContact: "", trust: 3, commission: "", directOwner: false, notes: "" });
@@ -757,7 +757,7 @@ export default function ShetkjaminApp() {
   const [presets, setPresets] = useState([]);
   const [activePreset, setActivePreset] = useState("default");
   const [decisions, setDecisions] = useState({});
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState("plots");
   const [selId, setSelId] = useState(null);
   const [editPlot, setEditPlot] = useState(null);
   const [editAgent, setEditAgent] = useState(null);
@@ -782,6 +782,22 @@ export default function ShetkjaminApp() {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
+  // Background map tile preloader — loads Pune region tiles silently on startup
+  useEffect(() => {
+    const preload = setTimeout(() => {
+      try {
+        const div = document.createElement("div");
+        div.style.cssText = "position:absolute;left:-9999px;top:-9999px;width:400px;height:300px;visibility:hidden;";
+        document.body.appendChild(div);
+        const preMap = L.map(div, { center: [PUNE_LAT, PUNE_LNG], zoom: 10, zoomControl: false, attributionControl: false });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 12 }).addTo(preMap);
+        // Clean up after tiles have loaded
+        setTimeout(() => { try { preMap.remove(); div.remove(); } catch(e){} }, 8000);
+      } catch (e) { /* silent fail */ }
+    }, 2000); // Start preloading 2 seconds after app mount
+    return () => clearTimeout(preload);
+  }, []);
+
   // Room join handler
   const joinRoom = (code) => {
     setRoomCode(code);
@@ -792,7 +808,7 @@ export default function ShetkjaminApp() {
     clearRoomCode();
     setRoomCodeState("");
     setPlots([]); setAgents([]); setWeights(DEFAULT_WEIGHTS); setPresets([]); setDecisions({});
-    setView("dashboard");
+    setView("plots");
   };
 
   // ═══ FIRESTORE REAL-TIME LISTENERS ═══
@@ -947,7 +963,7 @@ export default function ShetkjaminApp() {
 
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
-        <TopBar title="⭐ गुणांकन" onBack={() => setView("dashboard")} right={<button onClick={() => setShowWeights(!showWeights)} className="p-2 rounded-lg hover:bg-gray-100"><Settings size={18} className="text-gray-600"/></button>} />
+        <TopBar title="⭐ गुणांकन" onBack={() => setView("plots")} right={<button onClick={() => setShowWeights(!showWeights)} className="p-2 rounded-lg hover:bg-gray-100"><Settings size={18} className="text-gray-600"/></button>} />
         <div className="p-4 space-y-3">
 
           {/* Active preset indicator */}
@@ -1144,10 +1160,25 @@ export default function ShetkjaminApp() {
     );
   }
 
-  // ═══ PLOT LIST ═══
+  // ═══ PLOT LIST (HOME) ═══
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <TopBar title={`प्लॉट्स (${filtered.length})`} right={<button onClick={() => setShowF(!showFilter)} className={`p-2 rounded-lg ${showFilter?"bg-emerald-100":"hover:bg-gray-100"}`}><Filter size={18} className={showFilter?"text-emerald-700":"text-gray-600"}/></button>} />
+      <div className="bg-emerald-800 text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🌾</span>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">शेतजमीन ट्रॅकर</h1>
+            <p className="text-emerald-300 text-xs">{plots.length} प्लॉट</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-white/15 rounded-full px-2.5 py-1">
+            {online ? <Wifi size={12}/> : <WifiOff size={12}/>}
+            <span className="text-xs font-mono">{roomCode}</span>
+          </div>
+          <button onClick={() => setShowF(!showFilter)} className={`p-2 rounded-lg ${showFilter?"bg-white/25":"bg-white/10"}`}><Filter size={18} className="text-white"/></button>
+        </div>
+      </div>
       <div className="px-4 pt-2 space-y-2">
         <div className="relative"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="शोधा... (नाव, गाव, तालुका)" className="w-full pl-10 pr-3 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"/></div>
         {showFilter && <Card className="p-3 space-y-2">
@@ -1156,7 +1187,7 @@ export default function ShetkjaminApp() {
         </Card>}
       </div>
       <div className="px-4 pt-3 space-y-2.5">
-        {filtered.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">कोणताही प्लॉट नाही</div>}
+        {filtered.length === 0 && <div className="text-center py-12"><div className="text-4xl mb-3">📋</div><div className="text-gray-500 text-base mb-1">अजून प्लॉट नाहीत</div><div className="text-gray-400 text-sm mb-4">एजंटने कॉल केल्यावर इथे प्लॉट जोडा</div><Btn onClick={() => { setEditPlot(null); setView("form"); }}><Plus size={18}/> पहिला प्लॉट जोडा</Btn></div>}
         {filtered.map((p) => { const cost = p.areaGuntha && p.ratePerGuntha ? (p.areaGuntha*p.ratePerGuntha).toFixed(1) : null; const sc = scorePlot(p,weights); return (
           <Card key={p.id} onClick={() => { setSelId(p.id); setView("detail"); }} className="p-4">
             <div className="flex justify-between items-start mb-2"><div className="flex-1 min-w-0"><h3 className="text-base font-semibold text-gray-900 truncate">{p.name||"—"}</h3><p className="text-sm text-gray-500 mt-0.5">{p.village?p.village+", ":""}{p.taluka||"—"}</p></div><Badge status={p.status}/></div>
@@ -1184,8 +1215,8 @@ function BottomNav({ view, setView, setEditPlot }) {
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-lg">
       <div className="max-w-lg mx-auto flex">
         {[
-          { v: "dashboard", icon: Map, label: "नकाशा" },
           { v: "plots", icon: MapPin, label: "प्लॉट्स" },
+          { v: "dashboard", icon: Map, label: "नकाशा" },
           { v: "form", icon: Plus, label: "जोडा", special: true },
           { v: "scoring", icon: Award, label: "गुण" },
           { v: "more", icon: MoreHorizontal, label: "अधिक" },
