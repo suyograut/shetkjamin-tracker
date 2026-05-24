@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// FIREBASE CONFIG — Replace with YOUR project credentials
-// See FIREBASE_SETUP.md for step-by-step instructions
+// FIREBASE CONFIG
 // ═══════════════════════════════════════════════════════
 
 import { initializeApp } from "firebase/app";
@@ -8,12 +7,12 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
- apiKey: "AIzaSyBMeJxYje1_I_jWligvsdVGfc2lgV63Duc",
+  apiKey: "AIzaSyBMeJxYje1_I_jWligvsdVGfc2lgV63Duc",
   authDomain: "shetkjamin-tracker.firebaseapp.com",
   projectId: "shetkjamin-tracker",
   storageBucket: "shetkjamin-tracker.firebasestorage.app",
   messagingSenderId: "1072599352301",
-  appId: "1:1072599352301:web:b12953437c501bd7031de4"
+  appId: "1:1072599352301:web:b12953437c501bd7031de4",
 };
 
 const app = initializeApp(firebaseConfig);

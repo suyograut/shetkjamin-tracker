@@ -88,20 +88,20 @@ const PUNE_LAT = 18.5204, PUNE_LNG = 73.8567;
 const mkIcon = (color, name, gunthas, rateLabel) => L.divIcon({
   className: "",
   html: `<div style="transform:translate(-50%,-100%);position:relative;display:inline-block;">
-    <div style="background:#fff;border-radius:12px;padding:8px 14px;box-shadow:0 2px 12px rgba(0,0,0,0.18);min-width:100px;text-align:left;border:1px solid #e5e7eb;">
-      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-        <div style="width:22px;height:22px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;">
-          <div style="width:12px;height:12px;border-radius:50%;border:2.5px solid ${color};display:flex;align-items:center;justify-content:center;">
-            <div style="width:4px;height:4px;border-radius:50%;background:${color};"></div>
+    <div style="background:#fff;border-radius:8px;padding:4px 8px;box-shadow:0 1px 6px rgba(0,0,0,0.18);min-width:60px;text-align:left;border:1px solid #e5e7eb;">
+      <div style="display:flex;align-items:center;gap:3px;">
+        <div style="width:14px;height:14px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <div style="width:8px;height:8px;border-radius:50%;border:2px solid ${color};display:flex;align-items:center;justify-content:center;">
+            <div style="width:3px;height:3px;border-radius:50%;background:${color};"></div>
           </div>
         </div>
-        <span style="font-weight:700;font-size:14px;color:#1a1a1a;">${name}</span>
-        ${gunthas ? `<span style="font-size:12px;color:#888;">• ${gunthas} Guntha</span>` : ""}
+        <span style="font-weight:700;font-size:11px;color:#1a1a1a;">${name}</span>
+        ${gunthas ? `<span style="font-size:10px;color:#888;">·${gunthas}G</span>` : ""}
       </div>
-      ${rateLabel ? `<div style="font-size:15px;font-weight:700;color:#15803d;margin-top:2px;padding-left:27px;">${rateLabel}</div>` : ""}
+      ${rateLabel ? `<div style="font-size:11px;font-weight:700;color:#15803d;margin-top:1px;padding-left:17px;">${rateLabel}</div>` : ""}
     </div>
-    <div style="width:2px;height:16px;background:#15803d;margin:0 auto;"></div>
-    <div style="width:8px;height:8px;border-radius:50%;background:#15803d;border:2px solid #fff;margin:-2px auto 0;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+    <div style="width:2px;height:10px;background:#15803d;margin:0 auto;"></div>
+    <div style="width:6px;height:6px;border-radius:50%;background:#15803d;border:1.5px solid #fff;margin:-1px auto 0;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>
   </div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
@@ -109,15 +109,15 @@ const mkIcon = (color, name, gunthas, rateLabel) => L.divIcon({
 const puneIcon = L.divIcon({
   className: "",
   html: `<div style="transform:translate(-50%,-100%);position:relative;display:inline-block;">
-    <div style="background:#fff;border-radius:14px;padding:10px 18px;box-shadow:0 3px 14px rgba(0,0,0,0.2);text-align:center;border:2px solid #15803d;">
-      <div style="width:36px;height:36px;border-radius:50%;background:#15803d;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">
-        <span style="font-size:18px;">🏠</span>
+    <div style="background:#fff;border-radius:10px;padding:6px 10px;box-shadow:0 2px 10px rgba(0,0,0,0.2);text-align:center;border:2px solid #15803d;">
+      <div style="width:24px;height:24px;border-radius:50%;background:#15803d;display:flex;align-items:center;justify-content:center;margin:0 auto 2px;">
+        <span style="font-size:12px;">🏠</span>
       </div>
-      <div style="font-weight:800;font-size:16px;color:#1a1a1a;">Pune</div>
-      <div style="font-size:12px;color:#666;margin-top:1px;">Home</div>
+      <div style="font-weight:800;font-size:12px;color:#1a1a1a;">Pune</div>
+      <div style="font-size:10px;color:#666;">Home</div>
     </div>
-    <div style="width:2px;height:12px;background:#15803d;margin:0 auto;"></div>
-    <div style="width:10px;height:10px;border-radius:50%;background:#15803d;border:2px solid #fff;margin:-2px auto 0;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+    <div style="width:2px;height:8px;background:#15803d;margin:0 auto;"></div>
+    <div style="width:6px;height:6px;border-radius:50%;background:#15803d;border:1.5px solid #fff;margin:-1px auto 0;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>
   </div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
@@ -743,20 +743,6 @@ function LeafletMap({ plots, onPlotClick }) {
         fillColor: c.color, fillOpacity: 0.03, dashArray: c.dash,
       }).addTo(map);
     });
-
-    // Legend control
-    const legend = L.control({ position: "topleft" });
-    legend.onAdd = () => {
-      const div = L.DomUtil.create("div");
-      div.innerHTML = `<div style="background:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 2px 10px rgba(0,0,0,0.15);font-size:13px;line-height:1.8;">
-        <div style="font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="font-size:15px;">🕐</span> Drive time from Home</div>
-        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #16a34a;"></span> 1 hr</div>
-        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #ca8a04;"></span> 2 hr</div>
-        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #6366f1;"></span> 4 hr</div>
-      </div>`;
-      return div;
-    };
-    legend.addTo(map);
 
     mapRef.current = map;
     setTimeout(() => map.invalidateSize(), 200);
