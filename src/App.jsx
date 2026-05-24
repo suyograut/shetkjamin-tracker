@@ -82,18 +82,52 @@ const scorePlot = (p, w) => {
 };
 const mkPlot = () => ({ id: uid(), name: "", taluka: "", village: "", gutNo: "", areaGuntha: "", ratePerGuntha: "", distKm: "", travelHrs: "", road: "", soil: "", waterSrc: "", borewellDepth: "", waterAvail: "", elec: "", network: "", terrain: "", surrounding: "", culture: "", existingCrops: "", farmhouseFeasible: "", sevenTwelve: "", ownerType: "", agentName: "", agentPhone: "", visitDate: "", visitNotes: "", photoLink: "", mapsLink: "", status: "new", scores: {}, checklist: {}, media: [], description: "", priceOptions: [], lat: "", lng: "" });
 
-// Leaflet marker icons — dark text on light background for readability
+// Leaflet marker icons — card-style pins matching reference design
 const PUNE_LAT = 18.5204, PUNE_LNG = 73.8567;
-const mkIcon = (color, label) => L.divIcon({
-  className: "custom-marker",
-  html: `<div style="background:#fffffc;color:#1a1a1a;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:3px solid ${color};text-align:center;transform:translate(-50%,-100%);position:relative;line-height:1.2;">${label}<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid ${color};position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);"></div></div>`,
+
+const mkIcon = (color, name, gunthas, rateLabel) => L.divIcon({
+  className: "",
+  html: `<div style="transform:translate(-50%,-100%);position:relative;display:inline-block;">
+    <div style="background:#fff;border-radius:12px;padding:8px 14px;box-shadow:0 2px 12px rgba(0,0,0,0.18);min-width:100px;text-align:left;border:1px solid #e5e7eb;">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+        <div style="width:22px;height:22px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;">
+          <div style="width:12px;height:12px;border-radius:50%;border:2.5px solid ${color};display:flex;align-items:center;justify-content:center;">
+            <div style="width:4px;height:4px;border-radius:50%;background:${color};"></div>
+          </div>
+        </div>
+        <span style="font-weight:700;font-size:14px;color:#1a1a1a;">${name}</span>
+        ${gunthas ? `<span style="font-size:12px;color:#888;">• ${gunthas} Guntha</span>` : ""}
+      </div>
+      ${rateLabel ? `<div style="font-size:15px;font-weight:700;color:#15803d;margin-top:2px;padding-left:27px;">${rateLabel}</div>` : ""}
+    </div>
+    <div style="width:2px;height:16px;background:#15803d;margin:0 auto;"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:#15803d;border:2px solid #fff;margin:-2px auto 0;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+  </div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
+
 const puneIcon = L.divIcon({
-  className: "pune-marker",
-  html: `<div style="background:#dc2626;color:#fff;padding:6px 12px;border-radius:10px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(220,38,38,0.4);border:2px solid #fff;text-align:center;transform:translate(-50%,-100%);position:relative;">📍 पुणे<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #dc2626;position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);"></div></div>`,
+  className: "",
+  html: `<div style="transform:translate(-50%,-100%);position:relative;display:inline-block;">
+    <div style="background:#fff;border-radius:14px;padding:10px 18px;box-shadow:0 3px 14px rgba(0,0,0,0.2);text-align:center;border:2px solid #15803d;">
+      <div style="width:36px;height:36px;border-radius:50%;background:#15803d;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">
+        <span style="font-size:18px;">🏠</span>
+      </div>
+      <div style="font-weight:800;font-size:16px;color:#1a1a1a;">Pune</div>
+      <div style="font-size:12px;color:#666;margin-top:1px;">Home</div>
+    </div>
+    <div style="width:2px;height:12px;background:#15803d;margin:0 auto;"></div>
+    <div style="width:10px;height:10px;border-radius:50%;background:#15803d;border:2px solid #fff;margin:-2px auto 0;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+  </div>`,
   iconSize: [0, 0], iconAnchor: [0, 0],
 });
+
+// Drive time radius circles (approximate radii in meters)
+const DRIVE_CIRCLES = [
+  { radius: 35000, label: "1 hr", color: "#16a34a", dash: "8 6" },
+  { radius: 75000, label: "2 hr", color: "#ca8a04", dash: "10 8" },
+  { radius: 150000, label: "4 hr", color: "#6366f1", dash: "12 10" },
+];
 const mkAgent = () => ({ id: uid(), name: "", phone: "", area: "", referral: "", firstContact: "", trust: 3, commission: "", directOwner: false, notes: "" });
 const waMsg = (p, w) => {
   const cost = p.areaGuntha && p.ratePerGuntha ? (p.areaGuntha * p.ratePerGuntha).toFixed(2) : "—";
@@ -697,10 +731,34 @@ function LeafletMap({ plots, onPlotClick }) {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
     }).addTo(map);
-    // Pune marker
-    L.marker([PUNE_LAT, PUNE_LNG], { icon: puneIcon }).addTo(map).bindPopup("<b>📍 पुणे (Pune)</b><br/>तुमचे शहर");
+
+    // Pune Home marker
+    L.marker([PUNE_LAT, PUNE_LNG], { icon: puneIcon, zIndexOffset: 1000 }).addTo(map)
+      .bindPopup("<b>📍 पुणे (Pune)</b><br/>तुमचे शहर");
+
+    // Drive time radius circles
+    DRIVE_CIRCLES.forEach((c) => {
+      L.circle([PUNE_LAT, PUNE_LNG], {
+        radius: c.radius, color: c.color, weight: 2, opacity: 0.5,
+        fillColor: c.color, fillOpacity: 0.03, dashArray: c.dash,
+      }).addTo(map);
+    });
+
+    // Legend control
+    const legend = L.control({ position: "topleft" });
+    legend.onAdd = () => {
+      const div = L.DomUtil.create("div");
+      div.innerHTML = `<div style="background:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 2px 10px rgba(0,0,0,0.15);font-size:13px;line-height:1.8;">
+        <div style="font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="font-size:15px;">🕐</span> Drive time from Home</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #16a34a;"></span> 1 hr</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #ca8a04;"></span> 2 hr</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:28px;height:0;border-top:2px dashed #6366f1;"></span> 4 hr</div>
+      </div>`;
+      return div;
+    };
+    legend.addTo(map);
+
     mapRef.current = map;
-    // Fix tile rendering after layout
     setTimeout(() => map.invalidateSize(), 200);
     return () => { map.remove(); mapRef.current = null; };
   }, []);
@@ -709,18 +767,27 @@ function LeafletMap({ plots, onPlotClick }) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    // Remove old markers
     markersRef.current.forEach((m) => map.removeLayer(m));
     markersRef.current = [];
-    // Add new markers
     const bounds = [[PUNE_LAT, PUNE_LNG]];
     plots.forEach((p) => {
       const lat = Number(p.lat), lng = Number(p.lng);
       if (isNaN(lat) || isNaN(lng)) return;
       bounds.push([lat, lng]);
-      const rate = p.ratePerGuntha ? `₹${p.ratePerGuntha}L` : (p.priceOptions?.length > 0 ? (() => { const o = p.priceOptions[0]; return o.totalPrice && o.gunthas ? `₹${(o.totalPrice/o.gunthas).toFixed(2)}L` : "📍"; })() : "📍");
-      const color = p.status === "shortlisted" ? "#16a34a" : p.status === "rejected" ? "#dc2626" : p.status === "visited" ? "#0891b2" : "#6d28d9";
-      const marker = L.marker([lat, lng], { icon: mkIcon(color, rate) }).addTo(map);
+
+      // Build label info
+      const name = p.name || p.village || "—";
+      const gunthas = p.areaGuntha || "";
+      let rateLabel = "";
+      if (p.ratePerGuntha) {
+        rateLabel = `₹${p.ratePerGuntha}L / Guntha`;
+      } else if (p.priceOptions?.length > 0) {
+        const o = p.priceOptions[0];
+        if (o.totalPrice && o.gunthas && o.gunthas > 0) rateLabel = `₹${(o.totalPrice / o.gunthas).toFixed(2)}L / Guntha`;
+      }
+      const color = p.status === "shortlisted" ? "#16a34a" : p.status === "rejected" ? "#dc2626" : p.status === "visited" ? "#0891b2" : "#15803d";
+
+      const marker = L.marker([lat, lng], { icon: mkIcon(color, name, gunthas, rateLabel) }).addTo(map);
       const popup = `<div style="min-width:180px;font-family:inherit">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.name || "—"}</div>
         <div style="font-size:13px;color:#666;margin-bottom:6px">${p.village || ""}, ${p.taluka || ""}</div>
@@ -733,13 +800,11 @@ function LeafletMap({ plots, onPlotClick }) {
       marker.bindPopup(popup);
       markersRef.current.push(marker);
     });
-    // Fit bounds if plots exist
     if (bounds.length > 1) {
       try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 }); } catch (e) { /* ignore */ }
     }
   }, [plots]);
 
-  // Global callback for popup button
   useEffect(() => {
     window.__openPlot__ = (id) => onPlotClick(id);
     return () => { delete window.__openPlot__; };
